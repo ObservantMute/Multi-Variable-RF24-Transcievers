@@ -1,75 +1,63 @@
 #include <SPI.h>
+#include <nRF24L01.h>
 #include <RF24.h>
 #include <Servo.h>
 
-RF24 radio(7, 8);
+Servo Servo1;
+Servo Servo2;
 
-const byte rxAddr[6] = "00001";
-//SErvo control
-Servo yaw;
-//Servo pitch;
-//Servo roll;
-Servo thr;
-//Joystick ARray
-int joystick[6];
+unsigned long previousMillis = 0;
+const long interval = 10;
 
-void setup()
-{
-  for(int i = 2; i<=4; i++){
-    pinMode(i,OUTPUT);
-  }
+struct RECEIVE_DATA_STRUCTURE{
+  int16_t XVal;
+  int16_t YVal;
+};
 
-  
-  while (!Serial);
-  Serial.begin(9600);
+RECEIVE_DATA_STRUCTURE mydata_remote;
+
+RF24 radio(7, 8); // CSN, CE
+const byte address[6] = "00001";
+
+int intXVal;
+int intYVal;
+unsigned long currentMillis;
+
+void setup() {
+  Serial.begin(115200);
   
   radio.begin();
-  radio.setPALevel(RF24_PA_MAX);
-  radio.setAutoAck(false);
-  radio.openReadingPipe(0, rxAddr);
-  
+  radio.openReadingPipe(1, address[0]);
+  radio.setPALevel(RF24_PA_MIN);
   radio.startListening();
-  //Servo attachments
-  thr.attach(2);
-  yaw.attach(3);
-  //pitch.attach(4);
-  //roll.attach(5);
+
+  Servo1.attach(10);
+  Servo2.attach(9);
   
-  delay(50);
-  
+  Servo1.write(90);
+  Servo2.write(90); 
 }
 
-void loop()
-{
-  if (radio.available())
-  {
-    bool done = false;
-         while (!done)
-        { 
-          // Fetching the data payload
-          radio.read( joystick, sizeof(joystick) );
-         done = true; 
-         
-              
-         int val0=map(joystick[0],0,1024,0,180);
-         int val1=map(joystick[1],0,1024,0,180);
-         //int val2=map(joystick[2],0,1024,0,180);
-         //int val3=map(joystick[3],0,1024,0,180);
-        thr.write(val0);
-        yaw.write(val1);
-        //pitch.write(val2);
-        //roll.write(val3);
-        //for serial observation
-        Serial.println(val0);
-        Serial.println(val1);
-        //Serial.println(val2);
-        //Serial.println(val3);
-        }
-  }
-    else{
-      Serial.println("Data not received");
-      
+void loop() {
+  currentMillis = millis();
+  if (currentMillis - previousMillis >= 10) {
+    previousMillis = currentMillis;
+    if (radio.available()) {
+      radio.read(&mydata_remote, sizeof(RECEIVE_DATA_STRUCTURE));   
+    } else {
+      Serial.println("no data");
     }
+    intXVal = mydata_remote.XVal;
+    intYVal = mydata_remote.YVal;
+  }
+
+  int Servo1Val = map(intXVal, 0, 1024, 0, 180);
+  int Servo2Val = map(intYVal, 0, 1024, 0, 180);
+  Servo1.write(Servo1Val);
+  Servo2.write(Servo2Val);
   
-  delay(50);
+  Serial.print("X: ");
+  Serial.println(intXVal);
+  Serial.print("Y: ");
+  Serial.println(intYVal);
 }
